@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from math import degrees, cos, sin, tan, pi
+from math import degrees, cos, sin, pi
 from create_scene import add_polygon_to_scene
 import numpy as np
 from matplotlib.animation import FuncAnimation
@@ -83,12 +83,19 @@ class Car:
         self.x, self.y, self.theta = nextConfig
         self.update_body()
 
+    def setConfig(self,config):
+        self.x, self.y, self.theta = config
+        self.update_body()
+
     # Update the velocity making sure to stay within the restraints of [-0.5, 0.5]
     def update_velocity(self, v):
         if v >= 0:
             self.v = min(0.5, v)
         elif v < 0:
             self.v = max(-0.5, v)
+    
+    def getCurrConfig(self):
+        return np.array([self.x, self.y, self.theta])
     
     # Update phi while staying within restraints.
     def update_phi(self, phi):
@@ -149,7 +156,21 @@ class Car:
 
 def collides_no_controller(car_body, obstacles):
     return not (check_car(car_body, obstacles) and check_boundary(car_body))
-        
+
+def reposition_car(config, car):
+    x,y,theta = config
+    new_car = make_rigid_body((x,y))
+    car.body.set_x(new_car.get_x())
+    car.body.set_y(new_car.get_y())
+    car.body.set_angle(degrees(theta))
+
+def get_center(rectangle):
+    x = rectangle.get_x() + rectangle.get_width() / 2
+    y = rectangle.get_y() + rectangle.get_height() / 2
+    angle_rad = np.radians(rectangle.get_angle())  # Convert angle to radians
+    center_x = x + 0.5 * rectangle.get_width() * np.cos(angle_rad)
+    center_y = y + 0.5 * rectangle.get_height() * np.sin(angle_rad)
+    return center_x, center_y
 
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from rigid_body import CarController, check_car
 
-def make_rigid_body(center, angle = 0, opacity = 1):
+def make_rigid_body(center, angle = 0, opacity = 0.5):
     width = .2
     height = .1
     rectangle = patches.Rectangle(
@@ -20,8 +20,8 @@ def make_rigid_body(center, angle = 0, opacity = 1):
         angle = degrees(angle),
         rotation_point= 'center',
         edgecolor = 'r', 
-        facecolor = 'black',
-        alpha = opacity  
+        facecolor = 'none',
+        alpha = opacity
     )
     return rectangle
     

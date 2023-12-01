@@ -94,21 +94,13 @@ class Car:
     def start_animation(self):
         animation = FuncAnimation(self.fig, self.update_animation, init_func=self.init_animation, blit=True, repeat=False)
         plt.show()
-        # self.get_body()
-        # while self.continue_anim:
-        #     # Update state
-        #     self.next()
-            
-        #     # Visualization
-        #     plt.clf()
-        #     self.ax = plt.gca()
-        #     plt.xlim(0, 2)
-        #     plt.ylim(0, 2)
-        #     # Draw robot body
-        #     self.get_body()
-        #     self.ax.add_patch(self.body)
-            
-        #     plt.pause(0.05)
+
+def draw_rotated_rectangle(ax, center, angle_degrees, width=0.2, height=0.1, color='b'):
+    x, y = center
+    rect = patches.Rectangle((x - width / 2, y - height / 2), width, height, linewidth=1, edgecolor=color, facecolor='none')
+    t = Affine2D().rotate_deg_around(x, y, angle_degrees) + ax.transData
+    rect.set_transform(t)
+    ax.add_patch(rect)
 
     
 

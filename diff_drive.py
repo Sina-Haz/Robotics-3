@@ -34,8 +34,8 @@ class Car:
 
     def dq(self):
         dq = np.zeros_like(self.q)
-        dq[0] = self.u[0] * np.cos(self.q[2]+pi/2)
-        dq[1] = self.u[0] * np.sin(self.q[2]+pi/2)
+        dq[0] = self.u[0] * np.cos(self.q[2])
+        dq[1] = self.u[0] * np.sin(self.q[2])
         dq[2] = self.u[1]
         return dq*self.dt
     
@@ -63,7 +63,7 @@ class Car:
     def get_body(self):
         x, y, theta = self.q
         rect = patches.Rectangle((x - self.wid / 2, y - self.ht / 2), self.wid, self.ht, linewidth=1, edgecolor='b', facecolor='none')
-        t = Affine2D().rotate_deg_around(x, y, np.degrees(theta)) + self.ax.transData
+        t = Affine2D().rotate_deg_around(x, y, np.degrees(theta+pi/2)) + self.ax.transData
         rect.set_transform(t)
         self.body = rect
     

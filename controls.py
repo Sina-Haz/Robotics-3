@@ -1,6 +1,6 @@
 import numpy as np
 from diff_drive import Car
-from create_scene import create_plot, load_polygons
+from create_scene import create_plot, load_polygons, save_polygons
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 
@@ -13,35 +13,35 @@ def within_bounds(pt):
     return False
 
 def genInitPose():
-    while True:
-        new_sample = np.random.rand(3)
-        new_sample[0]*=2
-        new_sample[1]*=2
-        new_sample[2]*= 2*pi; new_sample[2] -= pi # Gets theta in [-pi, pi]
-        if within_bounds(new_sample): break
-    return new_sample
+    return np.array([np.random.uniform(0.2, 1.8), np.random.uniform(0.2, 1.8), np.random.uniform(-pi, pi)])
+
+def next(q, u,dt = 0.1):
+    dq = np.zeros_like(q)
+    dq[0] = u[0] * np.cos(q[2])
+    dq[1] = u[0] * np.sin(q[2])
+    dq[2] = u[1]
+    return q + (dq*dt)
+
+
 
 # Need 10 randomly sampled controls. For each control it lasts 2 seconds (2/0.1 = 20 dt's)
 # At every point we need to ensure it's within bounds, otherwise we need to resample
 def genControls(start):
-    tester = Car(ax=create_plot(), startConfig=start)
-    controls = []
-    # configs = [start] # Should be 200 total
+    controls = [] # Need 10 of these
+
     while len(controls) < 10:
-        prior = tester.q
-        rand_control = np.random.rand(2)
-        rand_control[0] -= 1/2 # Get's v in range [-0.5, 0.5]
-        rand_control[1] = rand_control[1]*1.8 - 0.9 # Get's phi in range [-0.9, 0.9]
-        tester.u = rand_control
-        new_configs = []
+        u = np.array([np.random.uniform(-0.5, 0.5), np.random.uniform(-0.9, 0.9)])
+
+        curr = start
+        gen_configs = []
         for _ in range(20):
-            tester.new_position()
-            new_configs.append(tester.q)
-        if all(within_bounds(config) for config in new_configs):
-            controls.append(rand_control)
-        else:
-            tester.q = prior
+            gen_configs.append(curr)
+            curr = next(curr, u)
+        if all(within_bounds(q) for q in gen_configs):
+            controls.append(u)
+            start = curr
     return controls
+        
 
 def update(frame, controls, car, visited, trace):
     x,y,_ = car.q
@@ -56,19 +56,36 @@ def update(frame, controls, car, visited, trace):
     trace.set_data(*zip(*visited))
     return [car.body, trace]
 
-if __name__ == '__main__':
-    start = genInitPose()
-    controls = genControls(start)
-    diff_car = Car(ax=create_plot(), startConfig=start)
+# Code to store the controls_X_Y.npy. X stands for the landmark map we use (0-4), Y for the control sequence (0-1)
+# It also generates the visualizations which we will store in video folder
+def store_contr(controls, initPose, X,Y):
+    diff_car = Car(ax=create_plot(), startConfig=initPose)
 
     landmarks = load_polygons('maps/landmarks_0.npy')
     visited=[]
     car_trace, = plt.plot([],[],'bo',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
 
+    to_store = [start]
+    for contr in controls:
+        to_store += [contr]*20
+    to_store = np.array(to_store,dtype='object')
+    # save_polygons(to_store, f'controls/controls_{X}_{Y}.npy')
+
     ani = FuncAnimation(diff_car.fig, update, frames=200,
                         fargs=(controls, diff_car,visited, car_trace),interval=100, blit=True, repeat=False)
     plt.show()
+
+
+
+if __name__ == '__main__':
+    start = genInitPose()
+    controls = genControls(start)
+    store_contr(controls, start,0,0)
+
+
+
+
 
 
     

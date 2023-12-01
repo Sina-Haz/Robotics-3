@@ -9,7 +9,7 @@ import matplotlib.patches as patches
 from matplotlib.transforms import Affine2D
 
 class Car:
-    def __init__(self,ax: plt.Axes, startConfig=(1,1,0), u = [0,0], w = 0.2, h = 0.1, dt = 0.05, obs = []):
+    def __init__(self,ax: plt.Axes, startConfig=(1,1,0), u = [0,0], w = 0.2, h = 0.1, dt = 0.1, obs = []):
         self.ax,self.fig = ax,ax.figure
         self.q = startConfig
         self.u = u

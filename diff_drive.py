@@ -5,187 +5,122 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from rigid_body import check_boundary, check_car
 from rigid_body_1 import make_rigid_body
-import argparse
+import matplotlib.patches as patches
+from matplotlib.transforms import Affine2D
 
 class Car:
-    def __init__(self, ax, startConfig = np.array([1,1,0]), dt = 0.1, width = 0.2, height = 0.1, obstacles = []):
-        self.ax = ax
-        self.width = width
-        self.height = height
-        self.x, self.y, self.theta = startConfig
-        self.L = 0.2 # length of wheelbase
-        self.obs = obstacles
+    def __init__(self,ax: plt.Axes, startConfig=(1,1,0), u = [0,0], w = 0.2, h = 0.1, dt = 0.05, obs = []):
+        self.ax,self.fig = ax,ax.figure
+        self.q = startConfig
+        self.u = u
+        self.wid = w
+        self.ht = h
         self.dt = dt
-        self.last_pos = None
+        self.obs = obs
 
-        # Initial control inputs are 0
-        self.v, self.phi = 0,0
-        self.continue_anim=True
-
-        # Have car body reflect starting config
-        self.body = make_rigid_body((self.x, self.y))
-        self.body.set_angle(degrees(self.theta))
-        self.ax.add_patch(self.body)
-        self.fig = ax.figure
-         # Set the axis limits
-        self.ax.set_xlim(0, 2)
-        self.ax.set_ylim(0, 2)
-        # Connect the event to the callback function
+        self.body = None
+        self.last_pos = []
+        self.continue_anim = True
+        self.ax.set_xlim(0,2)
+        self.ax.set_ylim(0,2)
         self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
 
     def set_obs(self, obstacles):
-        self.obs = obstacles
-    # Add obstacles to the plot
+            self.obs = obstacles
 
     def set_obs_plot(self):
         for p in self.obs:
             add_polygon_to_scene(p,self.ax,False)
 
-    # Computes q' based on current position and controls
-    def get_q_delta(self):
-        return [self.v*cos(self.theta), self.v*sin(self.theta), self.phi]
+    def dq(self):
+        dq = np.zeros_like(self.q)
+        dq[0] = self.u[0] * np.cos(self.q[2]+pi/2)
+        dq[1] = self.u[0] * np.sin(self.q[2]+pi/2)
+        dq[2] = self.u[1]
+        return dq*self.dt
     
-    #Sets velocity and direction of car
-    def set_velocity(self, v, phi):
-        self.v = v
-        self.phi = phi
+    # Get's the new position without collision/boundary avoidance, and without regard for drawing the body of the robot
+    def new_position(self):
+        self.q += self.dq()
 
-    # Updates the body using current configuration
-    def update_body(self):
-        self.body.set_x(self.x)
-        self.body.set_y(self.y)
-        self.body.set_angle(degrees(self.theta + pi/2))
+    # This function actually looks into drawing the robot, and avoiding things, drawing is handled by a different function
+    def next(self):
+        self.last_pos.append(self.q)
+        self.new_position()
+        if collides_no_controller(self.body, self.obs):
+            self.u = np.zeros_like(self.u)
+            self.q = self.go_back()
+            
 
-
-    # Computes next configuration based on controls and dt, updates self.x, self.y, self.theta, and self.body
-    def compute_next_position(self):
-        currConfig = np.array([self.x, self.y, self.theta])
-        q_delta = np.array(self.get_q_delta())
-        nextConfig = currConfig + q_delta*self.dt
-        placeholder_car = make_rigid_body(nextConfig[:2], nextConfig[2])
-
-        if not collides_no_controller(placeholder_car, self.obs):
-            self.last_pos = currConfig
-            self.x, self.y, self.theta = nextConfig
-            self.update_body()
-            return nextConfig
-        else:
-            # Set velocity to 0 and go back to last position
-            self.update_velocity(0)
-            self.x, self.y, self.theta = self.last_pos
-            self.update_body()
-
-
-    def find_next_position(self):
-        currConfig = np.array([self.x, self.y, self.theta])
-        q_delta = np.array(self.get_q_delta())
-        nextConfig = currConfig + q_delta*self.dt
-        self.x, self.y, self.theta = nextConfig
-        self.update_body()
-
-    def setConfig(self,config):
-        self.x, self.y, self.theta = config
-        self.update_body()
-
-    # Update the velocity making sure to stay within the restraints of [-0.5, 0.5]
-    def update_velocity(self, v):
-        if v >= 0:
-            self.v = min(0.5, v)
-        elif v < 0:
-            self.v = max(-0.5, v)
-    
-    def getCurrConfig(self):
-        return np.array([self.x, self.y, self.theta])
-    
-    # Update phi while staying within restraints.
-    def update_phi(self, phi):
-        if phi >= 0:
-            self.phi = min(0.9, phi)
-        elif phi < 0:
-            self.phi = max(-0.9, phi)
-
-    # Use arrow keys up and down for velocity, left and right for phi. This will run in a loop where each new frame changes
-    # by dt.
-    def on_key_press(self, event):
+    def go_back(self):
+        for q in reversed(self.last_pos):
+            self.q = q
+            if not collides_no_controller(self.get_body(), self.obs):
+                return q
+        return np.zeros_like(self.q)
         
-        vel_delta = 0.05
-        phi_delta = pi/40
-        if event.key == 'up':
-            self.update_velocity(self.v + vel_delta)
-        elif event.key == 'down':
-            self.update_velocity(self.v - vel_delta)
-        elif event.key == 'left':
-            self.update_phi(self.phi + phi_delta)
-        elif event.key == 'right':
-            self.update_phi(self.phi - phi_delta)
-        elif event.key == 'q':
-            self.continue_anim=False
+
+    def get_body(self):
+        x, y, theta = self.q
+        rect = patches.Rectangle((x - self.wid / 2, y - self.ht / 2), self.wid, self.ht, linewidth=1, edgecolor='b', facecolor='none')
+        t = Affine2D().rotate_deg_around(x, y, np.degrees(theta)) + self.ax.transData
+        rect.set_transform(t)
+        self.body = rect
     
+    def on_key_press(self,event, v_min=-0.5, v_max=0.5, omega_min=-0.9, omega_max=0.9):
+        if event.key == 'up':
+            self.u[0] = np.clip(self.u[0] + 0.05, v_min, v_max)
+        elif event.key == 'down':
+            self.u[0] = np.clip(self.u[0] - 0.05, v_min, v_max)
+        elif event.key == 'right':
+            self.u[1] = np.clip(self.u[1] - 0.1, omega_min, omega_max)
+        elif event.key == 'left':
+            self.u[1] = np.clip(self.u[1] + 0.1, omega_min, omega_max)
+        elif event.key == 'q':
+            self.continue_anim = False
 
     # Add this method to initialize the animation
     def init_animation(self):
+        self.get_body()
+        self.ax.add_patch(self.body)
         return [self.body]
-
-    # Add this method to update the animation at each frame
-    def update_animation_waypoints(self, frame, waypoints):
-        if not check_car(self.body, self.obs):
-            print("test")
-        if frame < len(waypoints) - 1:
-            self.update_velocity(waypoints[frame+1][3])
-            self.update_phi(waypoints[frame+1][4])
-        else:
-            self.update_velocity(waypoints[frame][3])
-            self.update_phi(waypoints[frame][4])
-        self.compute_next_position()
+    
+    def update_animation(self,frame):
+        self.next()
+        self.get_body()
+        self.ax.add_patch(self.body)
         return [self.body]
-
-
-    # Add this method to start the animation loop
-    def start_animation(self, frames = 0, interval = 0, waypoints = []):
-        if frames == 0:
-            animation = FuncAnimation(self.fig, self.update_animation, init_func=self.init_animation, blit=True)
-        else:
-            animation = FuncAnimation(self.fig, self.update_animation_waypoints, fargs=(waypoints,), init_func=self.init_animation, blit=True, frames = frames, interval = interval,repeat=False)
+    
+    def start_animation(self):
+        animation = FuncAnimation(self.fig, self.update_animation, init_func=self.init_animation, blit=True, repeat=False)
         plt.show()
+        # self.get_body()
+        # while self.continue_anim:
+        #     # Update state
+        #     self.next()
+            
+        #     # Visualization
+        #     plt.clf()
+        #     self.ax = plt.gca()
+        #     plt.xlim(0, 2)
+        #     plt.ylim(0, 2)
+        #     # Draw robot body
+        #     self.get_body()
+        #     self.ax.add_patch(self.body)
+            
+        #     plt.pause(0.05)
 
-        
-    # Add this method to update the animation at each frame
-    def update_animation(self, frame):
-        self.compute_next_position()
-        return [self.body]
+    
+
+
 
 def collides_no_controller(car_body, obstacles):
-    return not (check_car(car_body, obstacles) and check_boundary(car_body))
-
-def reposition_car(config, car):
-    x,y,theta = config
-    new_car = make_rigid_body((x,y))
-    car.body.set_x(new_car.get_x())
-    car.body.set_y(new_car.get_y())
-    car.body.set_angle(degrees(theta))
-
-def get_center(rectangle):
-    x = rectangle.get_x() + rectangle.get_width() / 2
-    y = rectangle.get_y() + rectangle.get_height() / 2
-    angle_rad = np.radians(rectangle.get_angle())  # Convert angle to radians
-    center_x = x + 0.5 * rectangle.get_width() * np.cos(angle_rad)
-    center_y = y + 0.5 * rectangle.get_height() * np.sin(angle_rad)
-    return center_x, center_y
-
+    if car_body:
+        return not (check_car(car_body, obstacles) and check_boundary(car_body))
+    else:
+        return False
 
 if __name__ == '__main__':
     fig = plt.figure("Car")
-    parser = argparse.ArgumentParser(description="My Script")
-    parser.add_argument("--myArg")
-    args, leftovers = parser.parse_known_args()
-    parser.add_argument('--control', type=float, nargs=2, required=False, help='control')
-    parser.add_argument('--start', type=float, nargs=3, required=False, help='target orientation')
-    args = parser.parse_args()
-    if args.control is None or args.start is None:
-        dynamic_car = Car(ax=fig.gca())
-        dynamic_car.start_animation()
-    else:
-        v,phi = args.control
-        dynamic_car = Car(ax=fig.gca(), startConfig = args.start,dt = 0.1)
-        dynamic_car.set_velocity(v,phi)
-        dynamic_car.start_animation()
+    dynamic_car = Car(ax=fig.gca())
+    dynamic_car.start_animation()

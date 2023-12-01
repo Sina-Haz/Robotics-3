@@ -1,5 +1,5 @@
 import numpy as np
-from diff_drive import Car, get_center
+from diff_drive import Car
 from create_scene import create_plot, load_polygons
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
@@ -28,30 +28,30 @@ def genControls(start):
     controls = []
     # configs = [start] # Should be 200 total
     while len(controls) < 10:
-        currConfig = tester.getCurrConfig()
+        prior = tester.q
         rand_control = np.random.rand(2)
         rand_control[0] -= 1/2 # Get's v in range [-0.5, 0.5]
-        rand_control[1] *= 1.8; rand_control[1] -= 0.9 # Get's phi in range [-0.9, 0.9]
-        v, phi = rand_control
-        tester.set_velocity(v, phi)
+        rand_control[1] = rand_control[1]*1.8 - 0.9 # Get's phi in range [-0.9, 0.9]
+        tester.u = rand_control
         new_configs = []
-        for i in range(20):
-            tester.find_next_position()
-            new_configs.append(tester.getCurrConfig())
+        for _ in range(20):
+            tester.new_position()
+            new_configs.append(tester.q)
         if all(within_bounds(config) for config in new_configs):
             controls.append(rand_control)
-            # configs += new_configs
         else:
-            tester.setConfig(currConfig)
+            tester.q = prior
     return controls
 
-def update(frame, controls,car, visited, trace):
-    x,y = get_center(car.body)
+def update(frame, controls, car, visited, trace):
+    x,y,_ = car.q
 
     if frame%20 == 0:
         v,phi = controls[int(frame/20)]
-        car.set_velocity(v,phi)
-    car.compute_next_position()
+        car.u = np.array([v,phi])
+    car.next()
+    car.get_body()
+    car.ax.add_patch(car.body)
     visited.append((x,y))
     trace.set_data(*zip(*visited))
     return [car.body, trace]

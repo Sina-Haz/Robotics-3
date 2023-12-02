@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import math
 from create_scene import load_polygons
 
 """A note on the files we create here:
@@ -46,6 +47,25 @@ def odometry_model(executed_controls, z = True):
         sensed_controls.append(u_sensed)
     return np.array(sensed_controls,dtype='object')
 
+#Returns the distance and the angle from every landmark in the scene to the ground truths of the rigid body.
+def landmark_sensor(ground_truth_x, ground_truth_y, ground_truth_theta, landmarks):
+    visible = []
+    for landmark in landmarks:
+        dx = landmark[0] - ground_truth_x
+        dy = landmark[1] - ground_truth_y
+
+        # Rotate relative position based on robot's orientation
+        rotated_x = dx * math.cos(-ground_truth_theta) - dy * math.sin(-ground_truth_theta)
+        rotated_y = dx * math.sin(-ground_truth_theta) + dy * math.cos(-ground_truth_theta)
+
+        # Calculate distance and angle to the landmark
+        distance = math.sqrt(rotated_x**2 + rotated_y**2)
+        angle = math.atan2(rotated_y, rotated_x)
+
+        #Add distance and angle to the visible list
+        visible.append([distance, angle])
+    visible_landmarks_local = np.array(visible, dtype='object')
+    return visible_landmarks_local
 
 # Usage: python3 simulate.py --plan controls/controls\_X\_Y.npy --map maps/landmark\_X.npy --execution gts/gt\_X\_Y.npy --sensing readings/readings\_X\_Y\_Z.npy
 if __name__=='__main__':

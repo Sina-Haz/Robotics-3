@@ -62,6 +62,10 @@ def landmark_sensor(ground_truth_x, ground_truth_y, ground_truth_theta, landmark
         distance = math.sqrt(rotated_x**2 + rotated_y**2)
         angle = math.atan2(rotated_y, rotated_x)
 
+        #Add noise
+        noise = np.random.normal(loc=0,scale=0.02)
+        distance += noise
+        angle += noise
         #Add distance and angle to the visible list
         visible.append([distance, angle])
     visible_landmarks_local = np.array(visible, dtype='object')
@@ -72,14 +76,15 @@ if __name__=='__main__':
     planned = load_polygons('controls/controls_0_0.npy')
     exec = actuation_model(planned)
     sensed = odometry_model(exec)
-    print(sensed - exec)
-    # parser = argparse.ArgumentParser(description='This file will simulate noisy robot motion + get readings')
+    #print(sensed - exec)
+    parser = argparse.ArgumentParser(description='This file will simulate noisy robot motion + get readings')
     # parser.add_argument('--plan', required=True, help='Planned controls that we want to execute')
-    # parser.add_argument('--map', required=True, help='Landmark map environment')
+    parser.add_argument('--map', required=True, help='Landmark map environment')
     # parser.add_argument('--execution', required=True, help='Ground truth something or other')
     # parser.add_argument('--execution', required=True, help='Ground truth Poses (201 rows total)')
     # parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
-
+    args = parser.parse_args()
+    print(landmark_sensor(0,0, math.radians(90), np.load(args.map)))
 
 
 

@@ -70,7 +70,7 @@ def store_contr(controls, initPose, X,Y, anim = False):
     if anim:
         show_animation(landmarks, initPose)
 
-def show_animation(landmarks,initPose):
+def show_animation(landmarks,initPose, controls):
     diff_car = Car(ax=create_plot(), startConfig=initPose)
     visited=[]
     car_trace, = plt.plot([],[],'bo',label='Trace')
@@ -100,7 +100,9 @@ def show_visualization(controls, landmarks,X,Y):
 if __name__ == '__main__':
     start = genInitPose()
     controls = genControls(start)
-    store_contr(controls, start,0,0)
+    landmarks = load_polygons('maps/landmarks_0.npy')
+    show_animation(landmarks,start, controls)
+
 
 
 

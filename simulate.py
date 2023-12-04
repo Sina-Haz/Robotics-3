@@ -93,12 +93,10 @@ def generate_readings(planned_controls, positions, landmarks, z):
         readings.append(executed_controls[i])
         readings.append(landmark_sensor(positions[i][0],positions[i][1],positions[i][2], landmarks))
     return np.array(readings, dtype= 'object')
+
+
 # Usage: python3 simulate.py --plan controls/controls\_X\_Y.npy --map maps/landmark\_X.npy --execution gts/gt\_X\_Y.npy --sensing readings/readings\_X\_Y\_Z.npy
 if __name__=='__main__':
-    planned = load_polygons('controls/controls_0_0.npy')
-    exec = actuation_model(planned)
-    sensed = odometry_model(exec)
-    #print(sensed - exec)
     parser = argparse.ArgumentParser(description='This file will simulate noisy robot motion + get readings')
     parser.add_argument('--plan', required=True, help='Planned controls that we want to execute')
     parser.add_argument('--map', required=True, help='Landmark map environment')
@@ -110,7 +108,7 @@ if __name__=='__main__':
     readings = generate_readings(actuation_model(np.load(args.plan, allow_pickle= True)), positions, landmarks, True)
     save_polygons(positions, args.execution)
     save_polygons(readings, args.sensing)
-    #print(landmark_sensor(0,0, math.radians(90), np.load(args.map)))
+    print(landmark_sensor(0,0, math.radians(90), np.load(args.map)))
 
 
 

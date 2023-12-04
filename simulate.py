@@ -107,8 +107,8 @@ if __name__=='__main__':
     args = parser.parse_args()
     positions = generate_gts_file(np.load(args.plan, allow_pickle= True))
     landmarks = np.load(args.map)
-    readings = generate_readings(actuation_model(np.load(args.plan, allow_pickle= True)), positions, landmarks, True)
-    save_polygons(positions, args.execution)
+    readings = generate_readings(actuation_model(np.load(args.plan, allow_pickle= True)), positions, landmarks, False)
+    #save_polygons(positions, args.execution)
     save_polygons(readings, args.sensing)
     #print(landmark_sensor(0,0, math.radians(90), np.load(args.map)))
 

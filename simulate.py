@@ -3,6 +3,8 @@ import numpy as np
 import math
 from diff_drive import Car,draw_rotated_rectangle
 from create_scene import create_plot, load_polygons, save_polygons,show_scene
+from controls import next
+import re
 
 """A note on the files we create here:
  - Ground Truth File: This is just 201 rows (1st row is initial pose), all the other rows are configs corresponding to 
@@ -15,7 +17,7 @@ from create_scene import create_plot, load_polygons, save_polygons,show_scene
 
 
 # So that we get reproducible results
-np.random.seed(42)
+# np.random.seed(42)
 
 # Simulate u_exec = u_planned+noise, noise_v has std deviation = 0.075, noise_phi has std deviation = 0.2
 # These controls are used to generate ground truth poses
@@ -69,33 +71,45 @@ def landmark_sensor(ground_truth_x, ground_truth_y, ground_truth_theta, landmark
         angle += noise
         #Add distance and angle to the visible list
         visible.append([distance, angle])
-    visible_landmarks_local = np.array(visible, dtype='object')
+    visible_landmarks_local = np.array(visible)
     return visible_landmarks_local
 
 #Generates the gts.npy files from the control files
-def generate_gts_file(planned_controls):
-    controls = actuation_model(planned_controls)
-    gts = []
-    gts.append(controls[0])
-    diff_car = Car(ax = create_plot(),startConfig=controls[0])
-    for control in controls:
-        diff_car.u = control[0], control[1]
-        diff_car.next()
-        gts.append([diff_car.q[0], diff_car.q[1], diff_car.q[2]])
-    return np.array(gts, dtype= 'object')
+def get_gt(executed_controls):
+    q = executed_controls[0] # init pose
+    gt = [q]
+    for u in executed_controls[1:]:
+        q = next(q,u)
+        gt.append(q)
+    return np.array(gt)
+
+def get_readings(sensed_controls, gt_poses, landmarks):
+    readings = [gt_poses[0]]
+    for i in range(1,201):
+        readings.append(sensed_controls[i])
+        x,y,theta = gt_poses[i]
+        readings.append(landmark_sensor(x,y,theta,landmarks))
+    return np.array(readings,dtype='object')
+
+
 
 # Generate the reading files,The amt of noise determined by param z. z = True means low
 # noise ('L'), z = False means high noise
-def generate_readings(planned_controls, positions, landmarks, z):
-    executed_controls = odometry_model(planned_controls, z)
-    readings = []
-    for i in range(len(executed_controls)):
-        readings.append(executed_controls[i])
-        readings.append(landmark_sensor(positions[i][0],positions[i][1],positions[i][2], landmarks))
-    return np.array(readings, dtype= 'object')
+# def generate_readings(planned_controls, positions, landmarks, z):
+#     executed_controls = odometry_model(planned_controls, z)
+#     readings = []
+#     for i in range(len(executed_controls)):
+#         readings.append(executed_controls[i])
+#         readings.append(landmark_sensor(positions[i][0],positions[i][1],positions[i][2], landmarks))
+#     return np.array(readings, dtype= 'object')
+
+def determine_z(reading_fname):
+    if 'L' in reading_fname:
+        return False
+    return True
 
 
-# Usage: python3 simulate.py --plan controls/controls\_X\_Y.npy --map maps/landmark\_X.npy --execution gts/gt\_X\_Y.npy --sensing readings/readings\_X\_Y\_Z.npy
+# Usage: python3 simulate.py --plan controls/controls_X_Y.npy --map maps/landmarks_X.npy --execution gts/gt_X_Y.npy --sensing readings/readings_X_Y_Z.npy
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='This file will simulate noisy robot motion + get readings')
     parser.add_argument('--plan', required=True, help='Planned controls that we want to execute')
@@ -103,12 +117,26 @@ if __name__=='__main__':
     parser.add_argument('--execution', required=True, help='Ground truth Poses (201 rows total)')
     parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
     args = parser.parse_args()
-    positions = generate_gts_file(np.load(args.plan, allow_pickle= True))
-    landmarks = np.load(args.map)
-    readings = generate_readings(actuation_model(np.load(args.plan, allow_pickle= True)), positions, landmarks, False)
-    #save_polygons(positions, args.execution)
-    save_polygons(readings, args.sensing)
-    print(landmark_sensor(0,0, math.radians(90), np.load(args.map)))
+
+    landmarks = load_polygons(args.map)
+    executed_controls = actuation_model(load_polygons(args.plan))
+    sensed_controls = odometry_model(executed_controls, determine_z(args.sensing))
+    gt_poses = get_gt(executed_controls)
+    readings = get_readings(sensed_controls,gt_poses,landmarks)
+
+    # Now that we've generated the stuff we need to save ground truths and readings
+    save_polygons(gt_poses,args.execution)
+    save_polygons(readings,args.sensing)
+
+
+
+
+    # positions = generate_gts_file(np.load(args.plan, allow_pickle= True))
+    # landmarks = np.load(args.map)
+    # readings = generate_readings(actuation_model(np.load(args.plan, allow_pickle= True)), positions, landmarks, False)
+    # #save_polygons(positions, args.execution)
+    # save_polygons(readings, args.sensing)
+    # print(landmark_sensor(0,0, math.radians(90), np.load(args.map)))
 
 
 

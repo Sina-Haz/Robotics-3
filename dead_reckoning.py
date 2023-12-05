@@ -7,6 +7,7 @@ from create_scene import create_plot,load_polygons
 import matplotlib.patches as patches
 from matplotlib.transforms import Affine2D
 
+
 """
 Visualizations we are creating here:
 
@@ -36,12 +37,11 @@ def update(frame, sensed, car1, visited1, trace1, visited2, trace2, poses):
 
     # This code will get ground truth animation using the poses
     pos = poses[frame]
-    gt_rect = get_body(plt.gca(), pos[0:2], np.degrees(pos[2] + np.pi/2))
-    car1.ax.add_patch(gt_rect)
     visited2.append(tuple(pos[0:2]))
     trace2.set_data(*zip(*visited2))
+    print(np.abs(pos - car1.q))
 
-    return [car1.body,trace1,gt_rect,trace2]
+    return [car1.body,trace1,trace2]
 
 def show_animation(landmarks,initPose,controls, poses):
     dead_reckon_car = Car(ax=create_plot(), startConfig=initPose)
@@ -64,13 +64,14 @@ if __name__ == '__main__':
     landmarks = load_polygons(args.map)
     gt = load_polygons(args.execution) # each row is a configuration
     readings = load_polygons(args.sensing)
+    plan = load_polygons('controls/controls_0_0.npy')
 
-    sensed_controls = []
+    sensed_controls = [readings[0]]
     for i in range(401):
-        if i%2 == 0:
+        if i%2 != 0:
             sensed_controls.append(readings[i])
-    # show_animation(landmarks,gt[0],sensed_controls, gt)
-    print(gt[0] == readings[0])
+    print(sensed_controls[:5])
+    show_animation(landmarks,gt[0],sensed_controls, gt)
 
 
 

@@ -17,21 +17,18 @@ import re
 
 
 # So that we get reproducible results
-# np.random.seed(42)
+np.random.seed(43)
 
 # Simulate u_exec = u_planned+noise, noise_v has std deviation = 0.075, noise_phi has std deviation = 0.2
 # These controls are used to generate ground truth poses
 def actuation_model(planned_controls):
     exec_controls = [planned_controls[0]]
     for u in planned_controls[1:]:
-        noise_v,noise_phi = np.random.normal(loc=0,scale=0.075),np.random.normal(loc=0,scale=0.2)
+        noise = [np.random.normal(loc=0,scale=0.075),np.random.normal(loc=0,scale=0.2)]
+        noise = np.array([0 if ui == 0 else n for ui,n in zip(u,noise)])
         u_exec = np.zeros_like(u)
-        if u[0] != 0:
-            u_exec[0] = np.clip(u[0]+noise_v, -0.5, 0.5)
-        if u[1] != 0:
-            u_exec[1] = np.clip(u[1]+noise_phi, -0.9, 0.9)
+        u_exec = u+noise
         exec_controls.append(u_exec)
-
     return np.array(exec_controls, dtype='object')
 
 # We simulate u_sensed by adding noise to executed controls. The amt of noise determined by param z. z = True means low

@@ -39,7 +39,6 @@ def update(frame, sensed, car1, visited1, trace1, visited2, trace2, poses):
     pos = poses[frame]
     visited2.append(tuple(pos[0:2]))
     trace2.set_data(*zip(*visited2))
-    print(np.abs(pos - car1.q))
 
     return [car1.body,trace1,trace2]
 
@@ -71,7 +70,7 @@ if __name__ == '__main__':
         if i%2 != 0:
             sensed_controls.append(readings[i])
     print(sensed_controls[:5])
-    show_animation(landmarks,gt[0],sensed_controls, gt)
+    show_animation(landmarks,gt[0],sensed_controls[1:], gt)
 
 
 

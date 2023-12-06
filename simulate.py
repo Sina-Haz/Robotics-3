@@ -28,6 +28,9 @@ def actuation_model(planned_controls):
         noise = np.array([0 if ui == 0 else n for ui,n in zip(u,noise)])
         u_exec = np.zeros_like(u)
         u_exec = u+noise
+        clip_v = np.clip(u_exec[0], -.5, .5)
+        clip_theta = np.clip(u_exec[1],-.9,.9)
+        u_exec = np.array([clip_v,clip_theta])
         exec_controls.append(u_exec)
     return np.array(exec_controls, dtype='object')
 

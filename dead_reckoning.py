@@ -69,7 +69,7 @@ if __name__ == '__main__':
     for i in range(401):
         if i%2 != 0:
             sensed_controls.append(readings[i])
-    print(sensed_controls[:5])
+
     show_animation(landmarks,gt[0],sensed_controls[1:], gt)
 
 

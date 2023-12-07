@@ -2,6 +2,10 @@ import argparse
 import numpy as np
 from create_scene import load_polygons
 
+# Global where we store the standard deviation of the controls according to the 'L'/'H' param and odometry model from 
+# readings.npy
+std_dev = None
+
 # This will be 200 controls from readings.npy
 def load_sensed_controls(readings):
     sensed = []
@@ -22,6 +26,31 @@ def load_landmark_readings(readings):
 def init_particles(pose, N):
     return np.full((N,3),pose)
 
+def set_std_dev(filename):
+    global std_dev
+    if 'L' in filename:
+        std_dev = np.array([0.05,0.1])
+    elif 'H' in filename:
+        std_dev = np.array([0.1,0.3])
+    else:
+        return Exception
+    
+# New version of next that can be applied to all particles and noise samples at once
+def next_np(q,u,dt=0.1):
+    dq = np.zeros_like(q)
+    dq[:, 0] = u[:, 0] * np.cos(q[:, 2])
+    dq[:, 1] = u[:, 0] * np.sin(q[:, 2])
+    dq[:, 2] = u[:, 1]
+    return q + (dq * dt)
+    
+# Move particles according to control input u, with Gaussian noise Q defined by our odometry model 
+def predict(particles, u, N):
+    global std_dev
+    noise_samples = np.random.normal(loc=u, scale=std_dev,size=(N,2))
+    return next_np(particles,noise_samples)
+    
+
+        
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Here we solve localization using particle filter')
@@ -34,10 +63,12 @@ if __name__ == '__main__':
     landmarks = load_polygons(args.map)
     readings = load_polygons(args.sensing)
     N = int(args.num_particles)
+    set_std_dev(args.sensing)
 
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
+    print(predict(init_particles(initPose,N), contr[0],N))
 
 
 

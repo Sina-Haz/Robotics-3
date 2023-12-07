@@ -149,7 +149,6 @@ def update_weights(particles, weights, distances, R, landmarks):
         distance=np.power((particles[:,0] - landmarks[i][0])**2 +(particles[:,1] - landmarks[i][1])**2,0.5)
         weights *= scipy.stats.norm(distance, R).pdf(distances[i][0])
  
- 
     weights += 1.e-300 # avoid round-off to zero
     weights /= sum(weights)
 

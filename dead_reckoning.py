@@ -25,7 +25,18 @@ def get_body(ax, center, angle_degrees, width=0.2, height=0.1, color='b'):
     rect.set_transform(t)
     return rect
 
-def update(frame, sensed, car1, visited1, trace1, visited2, trace2, poses):
+def get_landmk_pos(measure, pos):
+    print(measure)
+    print(pos)
+    lmk_positions = []
+    for i,ms in enumerate(measure):
+        dist,angle = ms
+        loc = np.array([dist*np.cos(angle), dist*np.sin(angle)])
+        lmk_positions.append(pos[:2]+loc)
+    return np.array(lmk_positions)
+
+
+def update(frame, sensed, measurements,car1, visited1, trace1, visited2, trace2, poses):
     # This code is to get dead reckoning car animation using controls
     x,y,_ = car1.q
     car1.u = sensed[frame]
@@ -40,16 +51,21 @@ def update(frame, sensed, car1, visited1, trace1, visited2, trace2, poses):
     visited2.append(tuple(pos[0:2]))
     trace2.set_data(*zip(*visited2))
 
+    # Plotting the red triangles
+    measure = measurements[frame]
+    positions = get_landmk_pos(measure,pos)
+    plt.scatter(positions[:,0],positions[:,1],marker='x')
+
     return [car1.body,trace1,trace2]
 
-def show_animation(landmarks,initPose,controls, poses):
+def show_animation(landmarks,initPose,controls,measurements, poses):
     dead_reckon_car = Car(ax=create_plot(), startConfig=initPose)
     visited1, visited2=[],[]
     car_trace, = plt.plot([],[],'ro',label='Trace')
     gt_trace, = plt.plot([],[],'bo',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
     ani = FuncAnimation(dead_reckon_car.fig, update, frames=200,
-                        fargs=(controls, dead_reckon_car,visited1, car_trace, visited2, gt_trace, poses),interval=100, blit=True, repeat=False)
+                        fargs=(controls, measurements,dead_reckon_car,visited1, car_trace, visited2, gt_trace, poses),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage python3 dead_reckoning.py --map maps/landmarks_X.npy --execution gts/gt_X_Y.npy --sensing readings/readings_X_Y_Z.npy
@@ -65,12 +81,20 @@ if __name__ == '__main__':
     readings = load_polygons(args.sensing)
     plan = load_polygons('controls/controls_0_0.npy')
 
-    sensed_controls = [readings[0]]
+    sensed_controls = []
     for i in range(401):
         if i%2 != 0:
             sensed_controls.append(readings[i])
 
-    show_animation(landmarks,gt[0],sensed_controls[1:], gt)
+    measurements = []
+    for i in range(1,401):
+        if i%2 == 0:
+            measurements.append(readings[i])
+    
+
+    positions = get_landmk_pos(measurements[1],gt[1])
+    print(positions[:,0].shape)
+    show_animation(landmarks,gt[0],sensed_controls,measurements, gt)
 
 
 

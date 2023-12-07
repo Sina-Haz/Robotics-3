@@ -126,15 +126,44 @@ def correction(particles, weights, reading, landmarks):
 
 
 
+#Creates uniform particles by randomly sampling possible robot configurations
+def create_uniform_particles(x_range, y_range, theta_range, N):
+    particles = np.empty((N, 3))
+    particles[:, 0] = np.random.uniform(x_range[0], x_range[1], size=N)
+    particles[:, 1] = np.random.uniform(y_range[0], y_range[1], size=N)
+    particles[:, 2] = np.random.uniform(theta_range[0], theta_range[1], size=N)
+    return particles
+
+def find_next_position(particles, control, dt=.1):
+    v = control[0]
+    phi = control[1]
+    N = len(particles)
+    dist = (v * dt)
+    particles[:, 0] += np.cos(particles[:, 2]) * dist
+    particles[:, 1] += np.sin(particles[:, 2]) * dist
+    particles[:, 2] += phi * dt
+
+def update_weights(particles, weights, distances, R, landmarks):
+    weights.fill(1.)
+    for i in range(len(landmarks)):
+        distance=np.power((particles[:,0] - landmarks[i][0])**2 +(particles[:,1] - landmarks[i][1])**2,0.5)
+        weights *= scipy.stats.norm(distance, R).pdf(distances[i][0])
+ 
+ 
+    weights += 1.e-300 # avoid round-off to zero
+    weights /= sum(weights)
 
 def systematic_resample(weights):
     N = len(weights)
-    positions = (np.arange(N) + np.random.random()) / N
+
+    # make N subdivisions, choose positions 
+    # with a consistent random offset
+    positions = (np.arange(N) + np.random.rand()) / N
 
     indexes = np.zeros(N, 'i')
     cumulative_sum = np.cumsum(weights)
     i, j = 0, 0
-    while i < N and j<N:
+    while i < N:
         if positions[i] < cumulative_sum[j]:
             indexes[i] = j
             i += 1
@@ -147,27 +176,36 @@ def resample_from_index(particles, weights, indexes):
     weights[:] = weights[indexes]
     weights /= np.sum(weights)
 
+
+
 def particle_filter(particles, weights, control, reading, landmarks, N):
     find_next_position(particles, control)
-    update_particles(particles, weights, reading, N, landmarks)
-    #indexes = systematic_resample(weights)
-    #resample_from_index(particles, weights, indexes)
-    return particles
+    update_weights(particles, weights, reading, .7, landmarks)
+    indexes = systematic_resample(weights)
+    resample_from_index(particles, weights, indexes)
 
 
-def update(frame, controls, distances, particles, weights, landmarks, ptrace):
-    particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  50)
+def update(frame, controls, car, visited, trace, distances, particles, weights, landmarks, ptrace, N):
+    particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
     ptrace.set_offsets(particles)
-    return [ptrace]
+    x,y,_ = car.q
+    car.u = controls[frame]
+    car.next()
+    car.get_body()
+    car.ax.add_patch(car.body)
+    visited.append((x,y))
+    trace.set_data(*zip(*visited))
+    return [car.body, trace, ptrace]
 
 
-def show_animation(landmarks, controls, distances, particles, weights):
+def show_animation(landmarks, controls, distances, particles, weights, N):
+    diff_car = Car(ax=create_plot(), startConfig=initPose)
     visited=[]
-    fig, ax = plt.subplots(dpi=100)
+    car_trace, = plt.plot([],[],'bo',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
     particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='o', color='blue')
-    ani = FuncAnimation(fig, update, frames=200,
-                        fargs=(controls, distances, particles, weights, landmarks, particle_trace),interval=100, blit=True, repeat=False)
+    ani = FuncAnimation(diff_car.fig, update, frames=200,
+                        fargs=(controls,diff_car,visited, car_trace, distances, particles, weights, landmarks, particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
@@ -187,13 +225,15 @@ if __name__ == '__main__':
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
-    particles = init_particles(initPose,N)
+    particles = create_uniform_particles((0,2), (0,2),(-pi, pi), N)
     weights = np.array([1.0]*N)
 
     for i in range(5):
         particles = prediction(particles,contr[i],N)
         correction(particles,weights,dists[i],landmarks)
         print(weights)
+    show_animation(landmarks,contr, dists, particles, weights, N)
+    #particle_filter(contr, dists, landmarks, N)
 
 
 

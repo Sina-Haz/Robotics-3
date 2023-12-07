@@ -42,6 +42,14 @@ def set_std_dev(filename):
     else:
         return Exception
     
+def cov_matrix():
+    global std_dev
+    variances = std_dev**2
+    cov = np.eye(2,2)
+    cov[0,0]*=variances[0]
+    cov[1,1]*=variances[1]
+    return cov
+    
 # New version of next that can be applied to all particles and noise samples at once
 def next_np(q,u,dt=0.1):
     dq = np.zeros_like(q)
@@ -139,9 +147,9 @@ if __name__ == '__main__':
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
-    particles = create_uniform_particles((0,2), (0,2), N)
+    particles = init_particles(initPose,N)
     weights = np.array([1.0]*N)
-    show_animation(landmarks,contr, dists, particles, weights)
+    print(cov_matrix())
     #particle_filter(contr, dists, landmarks, N)
 
 

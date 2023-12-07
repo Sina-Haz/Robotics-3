@@ -9,6 +9,10 @@ import matplotlib.pyplot as plt
 from diff_drive import Car
 
 
+# Global where we store the standard deviation of the controls according to the 'L'/'H' param and odometry model from 
+# readings.npy
+std_dev = None
+
 # This will be 200 controls from readings.npy
 def load_sensed_controls(readings):
     sensed = []
@@ -29,6 +33,37 @@ def load_landmark_readings(readings):
 def init_particles(pose, N):
     return np.full((N,3),pose)
 
+def set_std_dev(filename):
+    global std_dev
+    if 'L' in filename:
+        std_dev = np.array([0.05,0.1])
+    elif 'H' in filename:
+        std_dev = np.array([0.1,0.3])
+    else:
+        return Exception
+    
+def cov_matrix():
+    global std_dev
+    variances = std_dev**2
+    cov = np.eye(2,2)
+    cov[0,0]*=variances[0]
+    cov[1,1]*=variances[1]
+    return cov
+    
+# New version of next that can be applied to all particles and noise samples at once
+def next_np(q,u,dt=0.1):
+    dq = np.zeros_like(q)
+    dq[:, 0] = u[:, 0] * np.cos(q[:, 2])
+    dq[:, 1] = u[:, 0] * np.sin(q[:, 2])
+    dq[:, 2] = u[:, 1]
+    return q + (dq * dt)
+    
+# Move particles according to control input u, with Gaussian noise Q defined by our odometry model 
+def predict(particles, u, N):
+    global std_dev
+    noise_samples = np.random.normal(loc=u, scale=std_dev,size=(N,2))
+    return next_np(particles,noise_samples)
+        
 
 #Creates uniform particles by randomly sampling possible robot configurations
 def create_uniform_particles(x_range, y_range, theta_range, N):
@@ -118,12 +153,13 @@ if __name__ == '__main__':
     parser.add_argument('--map', required=True, help='Landmark map environment')
     parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
     parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
-    #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
+    parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
     args = parser.parse_args()
 
     landmarks = load_polygons(args.map)
     readings = load_polygons(args.sensing)
     N = int(args.num_particles)
+    set_std_dev(args.sensing)
 
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)

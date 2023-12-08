@@ -212,7 +212,7 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
     visited,estimates=[],[]
     car_trace, = plt.plot([],[],'bo',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
-    particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='o', color='orange', linewidths= 0.75)
+    particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
                         fargs=(controls,diff_car,visited,estimates, car_trace, distances, particles, weights, landmarks, particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()

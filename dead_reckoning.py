@@ -26,13 +26,14 @@ def get_body(ax, center, angle_degrees, width=0.2, height=0.1, color='b'):
     return rect
 
 def get_landmk_pos(measure, pos):
-    print(measure)
-    print(pos)
+    # print(measure)
+    # print(pos)
     lmk_positions = []
-    for i,ms in enumerate(measure):
+    for ms in measure:
         dist,angle = ms
         loc = np.array([dist*np.cos(angle), dist*np.sin(angle)])
-        lmk_positions.append(pos[:2]+loc)
+        loc+= pos[:2]
+        lmk_positions.append(loc)
     return np.array(lmk_positions)
 
 
@@ -55,7 +56,6 @@ def update(frame, sensed, measurements,car1, visited1, trace1, visited2, trace2,
     measure = measurements[frame]
     positions = get_landmk_pos(measure,pos)
     plt.scatter(positions[:,0],positions[:,1],marker='x')
-
     return [car1.body,trace1,trace2]
 
 def show_animation(landmarks,initPose,controls,measurements, poses):
@@ -93,7 +93,6 @@ if __name__ == '__main__':
     
 
     positions = get_landmk_pos(measurements[1],gt[1])
-    print(positions[:,0].shape)
     show_animation(landmarks,gt[0],sensed_controls,measurements, gt)
 
 

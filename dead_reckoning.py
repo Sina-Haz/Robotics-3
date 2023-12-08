@@ -37,6 +37,22 @@ def get_landmk_pos(measure, pos):
         lmk_positions.append(loc)
     return np.array(lmk_positions)
 
+def estimate_landmark_position(robot_x, robot_y, robot_theta, measurements):
+    landmark_positions = []
+    for measurement in measurements:
+        distance, angle = measurement
+
+        # Calculate relative landmark position in the robot's frame
+        landmark_x_rel = distance * math.cos(angle)
+        landmark_y_rel = distance * math.sin(angle)
+
+        # Rotate relative landmark position based on robot's orientation
+        landmark_x = robot_x + landmark_x_rel * math.cos(robot_theta) - landmark_y_rel * math.sin(robot_theta)
+        landmark_y = robot_y + landmark_x_rel * math.sin(robot_theta) + landmark_y_rel * math.cos(robot_theta)
+
+        landmark_positions.append([landmark_x, landmark_y])
+
+    return np.array(landmark_positions)
 
 def update(frame, sensed, sensors, car1, visited1, landmarks, trace1, visited2, trace2, poses):
     # This code is to get dead reckoning car animation using controls
@@ -56,11 +72,11 @@ def update(frame, sensed, sensors, car1, visited1, landmarks, trace1, visited2, 
 
     # Plotting the red triangles
     measure = measurements[frame]
-    positions = get_landmk_pos(measure,pos)
-    plt.scatter(positions[:,0],positions[:,1],marker='x')
-    return [car1.body,trace1,trace2]
+    #positions = get_landmk_pos(measure,pos)
+    #plt.scatter(positions[:,0],positions[:,1],marker='x')
+    return [car1.body,trace1,trace2, landmarks]
 
-def show_animation(landmarks,initPose,controls,measurements, poses):
+def show_animation(landmarks,initPose,controls,sensors, poses):
     dead_reckon_car = Car(ax=create_plot(), startConfig=initPose)
     visited1, visited2 =[],[]
     car_trace, = plt.plot([],[],'ro',label='Trace')
@@ -96,7 +112,7 @@ if __name__ == '__main__':
     
 
     positions = get_landmk_pos(measurements[1],gt[1])
-    show_animation(landmarks,gt[0],sensed_controls,measurements, gt)
+    show_animation(landmarks,gt[0],sensed_controls,load_landmark_readings(readings), gt)
 
 
 

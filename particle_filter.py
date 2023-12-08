@@ -69,17 +69,6 @@ def prediction(particles, u, N):
     noise_samples = np.random.normal(loc=u, scale=std_dev,size=(N,2))
     return next_np(particles,noise_samples)
 
-def get_landmark_dist(particle, landmark):
-    diff = particle[:2] - landmark
-
-    # Rotate relative position based on robot's orientation
-    rotated_x = diff[0] * np.cos(-particle[2]) - diff[1] * np.sin(-particle[2])
-    rotated_y = diff[0] * np.sin(-particle[2]) + diff[1] * np.cos(-particle[2])
-
-    # Calculate distance and angle to the landmark
-    distance = np.sqrt(rotated_x**2 + rotated_y**2)
-    angle = math.atan2(rotated_y, rotated_x)
-    return distance,angle
 
 #Returns the distance and the angle from every landmark in the scene to the ground truths of the rigid body.
 def landmark_dist(x, y, theta, landmark):
@@ -110,20 +99,38 @@ def landmark_dist(x, y, theta, landmark):
 #     particles[:, 0] += np.cos(control[1]) * dist
 #     particles[:, 1] += np.sin(control[1]) * dist
 
+# Helper function to normalize angles between -pi and pi
+def normalize_angles(angle):
+    return (angle + np.pi) % (2 * np.pi) - np.pi
+
 def correction(particles, weights, reading, landmarks):
     global sensor_std_dev
     for i,l in enumerate(landmarks):
         dist_distribution = scipy.stats.norm(loc = reading[i][0], scale=sensor_std_dev)
-        angle_distribution = scipy.stats.norm(loc = reading[i][1], scale=sensor_std_dev)
-        p_dists = np.array([landmark_dist(p[0],p[1],p[2],l) for p in particles])
+
+        # Can't use a linear gaussian distribution for angular measurements b/c they wrap around. Instead we will
+        # use vonmises distribution with kappa = 1/variance
+        angle_distribution = scipy.stats.vonmises(loc = reading[i][1], kappa=1/(sensor_std_dev**2))
+
+
+        p_dists = np.array([landmark_dist(p[0],p[1],p[2],l) for p in particles]) # N x 2 matrix
         probs_d = dist_distribution.pdf(p_dists[:,0])
         probs_d /= np.sum(probs_d)
-        probs_a = angle_distribution.pdf(p_dists[:,1])
+        probs_a = angle_distribution.pdf(normalize_angles(p_dists[:,1]))
         probs_a /= np.sum(probs_a)
         weights *= probs_d*probs_a
     weights += 1.e-300      # avoid round-off to zero
     weights /= sum(weights) # normalize weights
 
+def state_estimate(particles,weights):
+    # Compute weighted average for x, y
+    x_estimate = np.average(particles[:, 0], weights=weights)
+    y_estimate = np.average(particles[:, 1], weights=weights)
+
+    # Handling circular mean for theta
+    theta_estimate = np.arctan2(np.sum(np.sin(particles[:, 2]) * weights), np.sum(np.cos(particles[:, 2]) * weights))
+
+    return np.array([x_estimate, y_estimate, theta_estimate])
 
 
 #Creates uniform particles by randomly sampling possible robot configurations
@@ -162,7 +169,7 @@ def systematic_resample(weights):
     indexes = np.zeros(N, 'i')
     cumulative_sum = np.cumsum(weights)
     i, j = 0, 0
-    while i < N:
+    while i < N and j < N:
         if positions[i] < cumulative_sum[j]:
             indexes[i] = j
             i += 1
@@ -176,17 +183,19 @@ def resample_from_index(particles, weights, indexes):
     weights /= np.sum(weights)
 
 
-
 def particle_filter(particles, weights, control, reading, landmarks, N):
     find_next_position(particles, control)
     update_weights(particles, weights, reading, .7, landmarks)
     indexes = systematic_resample(weights)
     resample_from_index(particles, weights, indexes)
+    return state_estimate(particles,weights)
 
 
-def update(frame, controls, car, visited, trace, distances, particles, weights, landmarks, ptrace, N):
-    particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
+def update(frame, controls, car, visited,estimates, trace, distances, particles, weights, landmarks, ptrace, N):
+    estim = particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
+    estimates.append(estim[:2])
     ptrace.set_offsets(particles)
+
     x,y,_ = car.q
     car.u = controls[frame]
     car.next()
@@ -199,12 +208,12 @@ def update(frame, controls, car, visited, trace, distances, particles, weights, 
 
 def show_animation(landmarks, controls, distances, particles, weights, N):
     diff_car = Car(ax=create_plot(), startConfig=initPose)
-    visited=[]
+    visited,estimates=[],[]
     car_trace, = plt.plot([],[],'bo',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
-    particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='o', color='blue')
+    particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='x', color='red')
     ani = FuncAnimation(diff_car.fig, update, frames=200,
-                        fargs=(controls,diff_car,visited, car_trace, distances, particles, weights, landmarks, particle_trace, N),interval=100, blit=True, repeat=False)
+                        fargs=(controls,diff_car,visited,estimates, car_trace, distances, particles, weights, landmarks, particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
@@ -224,13 +233,13 @@ if __name__ == '__main__':
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
-    particles = create_uniform_particles((0,2), (0,2),(-pi, pi), N)
+    particles = init_particles(initPose,N)
     weights = np.array([1.0]*N)
 
-    for i in range(5):
-        particles = prediction(particles,contr[i],N)
-        correction(particles,weights,dists[i],landmarks)
-        print(weights)
+    # for i in range(5):
+    #     particles = prediction(particles,contr[i],N)
+    #     correction(particles,weights,dists[i],landmarks)
+    #     print(weights, sum(weights))
     show_animation(landmarks,contr, dists, particles, weights, N)
     #particle_filter(contr, dists, landmarks, N)
 

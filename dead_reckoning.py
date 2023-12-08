@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 from create_scene import create_plot,load_polygons
 import matplotlib.patches as patches
 from matplotlib.transforms import Affine2D
-from particle_filter import load_landmark_readings
+from particle_filter import load_landmark_readings, load_sensed_controls
 import math
 
 """
@@ -56,13 +56,13 @@ def estimate_landmark_position(robot_x, robot_y, robot_theta, measurements):
 
 def update(frame, sensed, sensors, car1, visited1, landmarks, trace1, visited2, trace2, poses):
     # This code is to get dead reckoning car animation using controls
-    x,y,theta = car1.q
     car1.u = sensed[frame]
     car1.next()
     car1.get_body()
     car1.ax.add_patch(car1.body)
+    x,y,theta = car1.q
     visited1.append((x,y))
-    x = estimate_landmark_position(x,y,theta, sensors[frame])
+    x = estimate_landmark_position(poses[frame][0], poses[frame][1], poses[frame][2], sensors[frame])
     trace1.set_data(*zip(*visited1))
     landmarks.set_offsets(x)
     # This code will get ground truth animation using the poses
@@ -110,13 +110,5 @@ if __name__ == '__main__':
         if i%2 == 0:
             measurements.append(readings[i])
     
-
     positions = get_landmk_pos(measurements[1],gt[1])
-    show_animation(landmarks,gt[0],sensed_controls,load_landmark_readings(readings), gt)
-
-
-
-
-
-
-
+    show_animation(landmarks,gt[0],load_sensed_controls(readings),load_landmark_readings(readings), gt)

@@ -75,9 +75,9 @@ def create_uniform_particles(x_range, y_range, theta_range, N):
 
 def find_next_position(particles, control,  dt=.1):
     global std_dev
-    v = control[0]
-    phi = control[1]
     N = len(particles)
+    v = control[0] + (np.random.randn(N) * std_dev[0])
+    phi = control[1]
     #dist = (v * dt) +  (np.random.randn(N) * std_dev[0])
     dist = (v * dt) 
     particles[:, 0] += np.cos(particles[:, 2]) * dist

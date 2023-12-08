@@ -142,9 +142,10 @@ def create_uniform_particles(x_range, y_range, theta_range, N):
     return particles
 
 def find_next_position(particles, control, dt=.1):
-    v = control[0]
-    phi = control[1]
+
     N = len(particles)
+    v = control[0] + (np.random.randn(N) * std_dev[1])
+    phi = control[1] + (np.random.randn(N) * std_dev[1])
     dist = (v * dt)
     particles[:, 0] += np.cos(particles[:, 2]) * dist
     particles[:, 1] += np.sin(particles[:, 2]) * dist
@@ -211,7 +212,7 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
     visited,estimates=[],[]
     car_trace, = plt.plot([],[],'bo',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
-    particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='x', color='red')
+    particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='o', color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
                         fargs=(controls,diff_car,visited,estimates, car_trace, distances, particles, weights, landmarks, particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
@@ -222,7 +223,7 @@ if __name__ == '__main__':
     parser.add_argument('--map', required=True, help='Landmark map environment')
     parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
     parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
-    parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
+    #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
     args = parser.parse_args()
 
     landmarks = load_polygons(args.map)

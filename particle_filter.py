@@ -66,7 +66,10 @@ def next_np(q,u,dt=0.1):
 # Move particles according to control input u, with Gaussian noise Q defined by our odometry model 
 def prediction(particles, u, N):
     global std_dev
-    noise_samples = np.random.normal(loc=u, scale=std_dev,size=(N,2))
+    noise_samples = np.ones((N,2))
+    noise_samples*=u
+    noise_samples[:,0] += np.random.normal(scale=std_dev[0])
+    noise_samples[:,1] += np.random.normal(scale=std_dev[1])
     return next_np(particles,noise_samples)
 
 
@@ -116,11 +119,12 @@ def correction(particles, weights, reading, landmarks):
         p_dists = np.array([landmark_dist(p[0],p[1],p[2],l) for p in particles]) # N x 2 matrix
         probs_d = dist_distribution.pdf(p_dists[:,0])
         probs_d /= np.sum(probs_d)
-        probs_a = angle_distribution.pdf(normalize_angles(p_dists[:,1]))
+        probs_a = angle_distribution.pdf(normalize_angles(p_dists[:,1])) + 1.e-300
         probs_a /= np.sum(probs_a)
         weights *= probs_d*probs_a
     weights += 1.e-300      # avoid round-off to zero
-    weights /= sum(weights) # normalize weights
+    weights/= np.sum(weights) # normalize weights
+    return weights
 
 def state_estimate(particles,weights):
     # Compute weighted average for x, y
@@ -142,9 +146,8 @@ def create_uniform_particles(x_range, y_range, theta_range, N):
     return particles
 
 def find_next_position(particles, control, dt=.1):
-
     N = len(particles)
-    v = control[0] + (np.random.randn(N) * std_dev[1])
+    v = control[0] + (np.random.randn(N) * std_dev[0])
     phi = control[1] + (np.random.randn(N) * std_dev[1])
     dist = (v * dt)
     particles[:, 0] += np.cos(particles[:, 2]) * dist
@@ -191,6 +194,15 @@ def particle_filter(particles, weights, control, reading, landmarks, N):
     resample_from_index(particles, weights, indexes)
     return state_estimate(particles,weights)
 
+def particle_filter2(particles, weights, control, reading, landmarks, N):
+    find_next_position(particles, control)
+    weights = correction(particles,weights,reading, landmarks)
+    indexes = systematic_resample(weights)
+    resample_from_index(particles, weights, indexes)
+    weights.fill(1.)
+    return state_estimate(particles, weights)
+
+
 
 def update(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,pscatter, ptrace, N):
     estim = particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
@@ -213,12 +225,44 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
     diff_car = Car(ax, startConfig=initPose)
     test_car = Car(ax, startConfig=initPose)
     visited,estimates=[],[]
-    car_trace, = plt.plot([],[],'bo',label='Trace')
-    particle_trace,  = plt.plot([],[],'ro',label='Trace')
+    car_trace, = plt.plot([],[],'ro',label='Trace')
+    particle_trace,  = plt.plot([],[],'bo',label='Trace') 
     plt.scatter(landmarks[:,0], landmarks[:,1])
     particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
                         fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks, particle_scatter,particle_trace, N),interval=100, blit=True, repeat=False)
+    plt.show()
+
+
+def update_gt(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,pscatter, ptrace, actual_trace, visited2,gt,N):
+    estim = particle_filter2(particles, weights, controls[frame], distances[frame],landmarks,  N)
+    estimates.append((estim[0], estim[1]))
+    ptrace.set_data(*zip(*estimates))
+    pscatter.set_offsets(particles)
+    car.set_q(estim[0], estim[1], estim[2])
+    car2.u = controls[frame]
+    car2.next()
+    x,y,_ = car2.q
+    car.get_body()
+    car.ax.add_patch(car.body)
+    visited.append((x,y))
+    visited2.append(gt[frame][0:2])
+    trace.set_data(*zip(*visited))
+    actual_trace.set_data(*zip(*visited2))
+    return [car.body, trace, pscatter, ptrace, actual_trace]
+
+def show_animation_gt(landmarks, controls, distances, particles, weights, gt,N):
+    ax=create_plot()
+    diff_car = Car(ax, startConfig=initPose)
+    test_car = Car(ax, startConfig=initPose)
+    visited,estimates, visited2=[],[],[]
+    actual_trace, = plt.plot([],[],'bo',label='Trace') # ground truth
+    car_trace, = plt.plot([],[],'ro',label='Trace') # dead reckon
+    particle_trace,  = plt.plot([],[],'ko',label='Trace') # state estimates
+    plt.scatter(landmarks[:,0], landmarks[:,1])
+    particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
+    ani = FuncAnimation(diff_car.fig, update_gt, frames=200,
+                        fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks, particle_scatter,particle_trace,actual_trace,visited2, gt, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
@@ -227,7 +271,8 @@ if __name__ == '__main__':
     parser.add_argument('--map', required=True, help='Landmark map environment')
     parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
     parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
-    #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
+    parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
+    parser.add_argument('--gt', required=False, help='ground truth to check')
     args = parser.parse_args()
 
     landmarks = load_polygons(args.map)
@@ -235,6 +280,7 @@ if __name__ == '__main__':
     N = int(args.num_particles)
     set_std_dev(args.sensing)
 
+    gt = np.load(args.gt)
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
@@ -245,7 +291,7 @@ if __name__ == '__main__':
     #     particles = prediction(particles,contr[i],N)
     #     correction(particles,weights,dists[i],landmarks)
     #     print(weights, sum(weights))
-    show_animation(landmarks,contr, dists, particles, weights, N)
+    show_animation_gt(landmarks,contr, dists, particles, weights, gt, N)
     #particle_filter(contr, dists, landmarks, N)
 
 

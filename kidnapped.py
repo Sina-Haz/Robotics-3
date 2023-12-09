@@ -168,13 +168,13 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
                         fargs=(controls,diff_car,test_car, visited,estimates, car_trace, distances, particles, weights, landmarks, particle_scatter, particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
 
-# Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
+# Usage: python3 kidnapped.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Here we solve localization using particle filter')
     parser.add_argument('--map', required=True, help='Landmark map environment')
     parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
     parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
-    #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
+    parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
     args = parser.parse_args()
 
     landmarks = load_polygons(args.map)

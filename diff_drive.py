@@ -59,7 +59,9 @@ class Car:
                 return q
         return np.zeros_like(self.q)
         
-
+    def set_q(self, x, y, theta):
+        self.q = (x,y,theta)
+    
     def get_body(self):
         x, y, theta = self.q
         rect = patches.Rectangle((x - self.wid / 2, y - self.ht / 2), self.wid, self.ht, linewidth=1, edgecolor='b', facecolor='none')

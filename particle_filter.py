@@ -192,29 +192,33 @@ def particle_filter(particles, weights, control, reading, landmarks, N):
     return state_estimate(particles,weights)
 
 
-def update(frame, controls, car, visited,estimates, trace, distances, particles, weights, landmarks, ptrace, N):
+def update(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,pscatter, ptrace, N):
     estim = particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
-    estimates.append(estim[:2])
-    ptrace.set_offsets(particles)
-
-    x,y,_ = car.q
-    car.u = controls[frame]
-    car.next()
+    estimates.append((estim[0], estim[1]))
+    ptrace.set_data(*zip(*estimates))
+    pscatter.set_offsets(particles)
+    car.set_q(estim[0], estim[1], estim[2])
+    car2.u = controls[frame]
+    car2.next()
+    x,y,_ = car2.q
     car.get_body()
     car.ax.add_patch(car.body)
     visited.append((x,y))
     trace.set_data(*zip(*visited))
-    return [car.body, trace, ptrace]
+    return [car.body, trace, pscatter, ptrace]
 
 
 def show_animation(landmarks, controls, distances, particles, weights, N):
-    diff_car = Car(ax=create_plot(), startConfig=initPose)
+    ax=create_plot()
+    diff_car = Car(ax, startConfig=initPose)
+    test_car = Car(ax, startConfig=initPose)
     visited,estimates=[],[]
     car_trace, = plt.plot([],[],'bo',label='Trace')
+    particle_trace,  = plt.plot([],[],'ro',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
-    particle_trace = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
+    particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
-                        fargs=(controls,diff_car,visited,estimates, car_trace, distances, particles, weights, landmarks, particle_trace, N),interval=100, blit=True, repeat=False)
+                        fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks, particle_scatter,particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy

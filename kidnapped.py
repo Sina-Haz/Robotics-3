@@ -124,41 +124,48 @@ def particle_filter(particles, weights, control, reading, landmarks, N):
     update_weights(particles, weights, reading, .7, landmarks)
     indexes = systematic_resample(weights)
     resample_from_index(particles, weights, indexes)
+    return state_estimate(particles,weights)
 
 
-#Returns the mean of all the particles
-def estimate(particles, weights):
-    x_avg = np.average(particles[:,0])
-    y_avg = np.average(particles[:,1])
-    return (x_avg, y_avg)
+def state_estimate(particles,weights):
+    # Compute weighted average for x, y
+    x_estimate = np.average(particles[:, 0], weights=weights)
+    y_estimate = np.average(particles[:, 1], weights=weights)
+
+    # Handling circular mean for theta
+    theta_estimate = np.arctan2(np.sum(np.sin(particles[:, 2]) * weights), np.sum(np.cos(particles[:, 2]) * weights))
+
+    return np.array([x_estimate, y_estimate, theta_estimate])
 
 #Update the position of the car as well as the positions of the particles
-def update(frame, controls, car, visited,pvisited, trace, distances, particles, weights, landmarks, scatter,ptrace, N):
-    x,y,_ = car.q
-    car.u = controls[frame]
-    car.next()
+def update(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks, scatter,ptrace, N):
+    estim = particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
+    estimates.append((estim[0], estim[1]))
+    ptrace.set_data(*zip(*estimates))
+    scatter.set_offsets(particles)
+    car.set_q(estim[0], estim[1], estim[2])
+    car2.u = controls[frame]
+    car2.next()
+    x,y,_ = car2.q
     car.get_body()
     car.ax.add_patch(car.body)
-    particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
-    scatter.set_offsets(particles)
-    pvisited.append(estimate(particles,weights))
     visited.append((x,y))
     trace.set_data(*zip(*visited))
-    ptrace.set_data(*zip(*pvisited))
     return [car.body, trace, scatter, ptrace]
 
 
 def show_animation(landmarks, controls, distances, particles, weights, N):
-    diff_car = Car(ax=create_plot(), startConfig=initPose)
+    ax=create_plot()
+    diff_car = Car(ax, startConfig=initPose)
+    test_car = Car(ax, startConfig=initPose)
     visited=[]
-    pvisited = []
-    print(particles)
+    estimates = []
     car_trace, = plt.plot([],[],'bo',label='Trace')
     particle_trace,  = plt.plot([],[],'ro',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
     particle_scatter = plt.scatter(particles[:,0], particles[:,1],s=10, marker='o', color='orange',alpha=0.5)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
-                        fargs=(controls,diff_car,visited,pvisited, car_trace, distances, particles, weights, landmarks, particle_scatter, particle_trace, N),interval=100, blit=True, repeat=False)
+                        fargs=(controls,diff_car,test_car, visited,estimates, car_trace, distances, particles, weights, landmarks, particle_scatter, particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy

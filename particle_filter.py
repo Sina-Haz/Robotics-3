@@ -7,7 +7,7 @@ from create_scene import create_plot,load_polygons
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 from diff_drive import Car
-from simulate import landmark_sensor
+
 
 """
 For observation model: getting P(z|x), the std deviation of distance and angle measurements are independent
@@ -21,10 +21,11 @@ to the readings (these are all independent)
 
 Resampling algorithm: can use any of the 4 in the kalman-filter.ipynb reference
 """
+
 # Global where we store the standard deviation of the controls according to the 'L'/'H' param and odometry model from 
 # readings.npy
 std_dev = None
-sensor_std_dev = 0.02
+sensor_std_dev = 0.4
 
 # This will be 200 controls from readings.npy
 def load_sensed_controls(readings):
@@ -88,19 +89,22 @@ def landmark_dist(x, y, theta, landmark):
     return distance,angle
 
 
-# Don't need these for this file
-# #Creates uniform particles by randomly sampling possible robot configurations
-# def create_uniform_particles(x_range, y_range, N):
-#     particles = np.empty((N, 2))
-#     particles[:, 0] = np.random.uniform(x_range[0], x_range[1], size=N)
-#     particles[:, 1] = np.random.uniform(y_range[0], y_range[1], size=N)
-#     return particles
+def estimate_landmark_position(robot_x, robot_y, robot_theta, measurements):
+    landmark_positions = []
+    for measurement in measurements:
+        distance, angle = measurement
 
-# def find_next_position(particles, control, dt=.1):
-#     N = len(particles)
-#     dist = (control[0] * dt)
-#     particles[:, 0] += np.cos(control[1]) * dist
-#     particles[:, 1] += np.sin(control[1]) * dist
+        # Calculate relative landmark position in the robot's frame
+        landmark_x_rel = distance * math.cos(angle)
+        landmark_y_rel = distance * math.sin(angle)
+
+        # Rotate relative landmark position based on robot's orientation
+        landmark_x = robot_x + landmark_x_rel * math.cos(robot_theta) - landmark_y_rel * math.sin(robot_theta)
+        landmark_y = robot_y + landmark_x_rel * math.sin(robot_theta) + landmark_y_rel * math.cos(robot_theta)
+
+        landmark_positions.append([landmark_x, landmark_y])
+
+    return np.array(landmark_positions)
 
 # Helper function to normalize angles between -pi and pi
 def normalize_angles(angle):
@@ -204,8 +208,8 @@ def particle_filter2(particles, weights, control, reading, landmarks, N):
 
 
 
-def update(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,pscatter, ptrace, N):
-    estim = particle_filter(particles, weights, controls[frame], distances[frame],landmarks,  N)
+def update(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,landmark_x, pscatter, ptrace, N):
+    estim = particle_filter2(particles, weights, controls[frame], distances[frame],landmarks,  N)
     estimates.append((estim[0], estim[1]))
     ptrace.set_data(*zip(*estimates))
     pscatter.set_offsets(particles)
@@ -217,7 +221,9 @@ def update(frame, controls, car, car2, visited,estimates, trace, distances, part
     car.ax.add_patch(car.body)
     visited.append((x,y))
     trace.set_data(*zip(*visited))
-    return [car.body, trace, pscatter, ptrace]
+    x = estimate_landmark_position(estim[0], estim[1], estim[2], distances[frame])
+    landmark_x.set_offsets(x)
+    return [car.body, trace, pscatter, ptrace, landmark_x]
 
 
 def show_animation(landmarks, controls, distances, particles, weights, N):
@@ -226,15 +232,16 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
     test_car = Car(ax, startConfig=initPose)
     visited,estimates=[],[]
     car_trace, = plt.plot([],[],'ro',label='Trace')
-    particle_trace,  = plt.plot([],[],'bo',label='Trace') 
+    particle_trace,  = plt.plot([],[],'ko',label='Trace') 
+    landmark_x = plt.scatter([], [], color='red', marker='x', linestyle='-')
     plt.scatter(landmarks[:,0], landmarks[:,1])
     particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
-                        fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks, particle_scatter,particle_trace, N),interval=100, blit=True, repeat=False)
+                        fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks,landmark_x, particle_scatter,particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 
-def update_gt(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,pscatter, ptrace, actual_trace, visited2,gt,N):
+def update_gt(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,landmark_x, pscatter, ptrace, actual_trace, visited2,gt,N):
     estim = particle_filter2(particles, weights, controls[frame], distances[frame],landmarks,  N)
     estimates.append((estim[0], estim[1]))
     ptrace.set_data(*zip(*estimates))
@@ -249,7 +256,9 @@ def update_gt(frame, controls, car, car2, visited,estimates, trace, distances, p
     visited2.append(gt[frame][0:2])
     trace.set_data(*zip(*visited))
     actual_trace.set_data(*zip(*visited2))
-    return [car.body, trace, pscatter, ptrace, actual_trace]
+    x = estimate_landmark_position(estim[0], estim[1], estim[2], distances[frame])
+    landmark_x.set_offsets(x)
+    return [car.body, trace, pscatter, ptrace, actual_trace, landmark_x]
 
 def show_animation_gt(landmarks, controls, distances, particles, weights, gt,N):
     ax=create_plot()
@@ -259,10 +268,11 @@ def show_animation_gt(landmarks, controls, distances, particles, weights, gt,N):
     actual_trace, = plt.plot([],[],'bo',label='Trace') # ground truth
     car_trace, = plt.plot([],[],'ro',label='Trace') # dead reckon
     particle_trace,  = plt.plot([],[],'ko',label='Trace') # state estimates
+    landmark_x = plt.scatter([], [], color='red', marker='x', linestyle='-')
     plt.scatter(landmarks[:,0], landmarks[:,1])
     particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update_gt, frames=200,
-                        fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks, particle_scatter,particle_trace,actual_trace,visited2, gt, N),interval=100, blit=True, repeat=False)
+                        fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks,landmark_x, particle_scatter,particle_trace,actual_trace,visited2, gt, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
@@ -272,7 +282,7 @@ if __name__ == '__main__':
     parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
     parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
     parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
-    parser.add_argument('--gt', required=False, help='ground truth to check')
+    # parser.add_argument('--gt', required=False, help='ground truth to check')
     args = parser.parse_args()
 
     landmarks = load_polygons(args.map)
@@ -280,7 +290,7 @@ if __name__ == '__main__':
     N = int(args.num_particles)
     set_std_dev(args.sensing)
 
-    gt = np.load(args.gt)
+    # gt = np.load(args.gt)
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
@@ -291,7 +301,7 @@ if __name__ == '__main__':
     #     particles = prediction(particles,contr[i],N)
     #     correction(particles,weights,dists[i],landmarks)
     #     print(weights, sum(weights))
-    show_animation_gt(landmarks,contr, dists, particles, weights, gt, N)
+    show_animation(landmarks,contr, dists, particles, weights, N)
     #particle_filter(contr, dists, landmarks, N)
 
 

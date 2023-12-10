@@ -22,9 +22,10 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
     ani = FuncAnimation(diff_car.fig, update, frames=200,
                         fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks,landmark_x, particle_scatter,particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
+    return np.array(estimates)
 
 
-# Usage: python3 kidnapped.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim2/estim1_X_Y_Z_N.npy
+# Usage: python3 kidnapped.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim2/estim2_X_Y_Z_N.npy
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Here we solve localization using particle filter')
     parser.add_argument('--map', required=True, help='Landmark map environment')
@@ -49,5 +50,6 @@ if __name__ == '__main__':
     #     particles = prediction(particles,contr[i],N)
     #     correction(particles,weights,dists[i],landmarks)
     #     print(weights, sum(weights))
-    show_animation(landmarks,contr, dists, particles, weights, N)
+    estimates = show_animation(landmarks,contr, dists, particles, weights, N)
+    np.save(args.estimates, estimates, allow_pickle=True)
     #particle_filter(contr, dists, landmarks, N)

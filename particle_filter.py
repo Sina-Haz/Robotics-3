@@ -206,6 +206,13 @@ def particle_filter2(particles, weights, control, reading, landmarks, N):
     weights.fill(1.)
     return state_estimate(particles, weights)
 
+def get_ests(particles, weights, controls, readings, landmarks, N):
+    est1 = [particles[0]] # init pose
+    for control, read in zip(controls, readings):
+        new_est = particle_filter2(particles, weights, control, read, landmarks, N)
+        est1.append(new_est)
+    return np.array(est1)
+
 
 
 def update(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,landmark_x, pscatter, ptrace, N):
@@ -272,6 +279,7 @@ def show_animation_gt(landmarks, controls, distances, particles, weights, gt,N):
     landmark_x = plt.scatter([], [], color='red', marker='x', linestyle='-')
     plt.scatter(landmarks[:,0], landmarks[:,1])
     particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
+    plt.close(diff_car.fig)
     ani = FuncAnimation(diff_car.fig, update_gt, frames=200,
                         fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks,landmark_x, particle_scatter,particle_trace,actual_trace,visited2, gt, N),interval=100, blit=True, repeat=False)
     plt.show()
@@ -305,7 +313,7 @@ if __name__ == '__main__':
     #     print(weights, sum(weights))
     # estimates = generate_estimates(landmarks, contr,dists, particles, weights, N)
     ests = show_animation(landmarks,contr, dists, particles, weights, N)
-    print(ests.shape)
+    np.save(args.estimates, ests, allow_pickle=True)
     #particle_filter(contr, dists, landmarks, N)
 
 

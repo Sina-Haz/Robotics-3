@@ -6,6 +6,7 @@ from create_scene import load_polygons, create_plot
 from diff_drive import Car
 
 def update(frame, car, gts, ests, gt_trace, estim_trace, gt_visit, estim_visit):
+    if car.body: car.body.remove()
     gt_pos, estim_pos = gts[frame+1], ests[frame+1]
     car.set_q(*gt_pos)
     car.get_body()

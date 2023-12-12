@@ -26,6 +26,15 @@ Resampling algorithm: can use any of the 4 in the kalman-filter.ipynb reference
 # readings.npy
 std_dev = None
 sensor_std_dev = 0.2
+X,Y,Z,N = None,None,None,None
+
+def set_X_Y_Z(fname):
+    global X,Y,Z
+    toks = fname.split('_')
+    X = toks[1]
+    Y = toks[2]
+    Z = toks[3]
+    N = toks[4]
 
 # This will be 200 controls from readings.npy
 def load_sensed_controls(readings):
@@ -216,6 +225,7 @@ def get_ests(particles, weights, controls, readings, landmarks, N):
 
 
 def update(frame, controls, car, car2, visited,estimates, trace, distances, particles, weights, landmarks,landmark_x, pscatter, ptrace, N):
+    if car.body: car.body.remove()
     estim = particle_filter2(particles, weights, controls[frame], distances[frame],landmarks, N)
     estimates.append(estim)
     ptrace.set_data(*zip(*(point[:2] for point in estimates)))
@@ -245,7 +255,7 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
     particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
                         fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks,landmark_x, particle_scatter,particle_trace, N),interval=100, blit=True, repeat=False)
-    plt.show()
+    ani.save(f'video1/particles_{X}_{Y}_{Z}_{N}.mp4', writer='ffmpeg', fps=30)
     return np.array(estimates)
 
 
@@ -295,6 +305,8 @@ if __name__ == '__main__':
     parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
     args = parser.parse_args()
 
+    set_X_Y_Z(args.estimates)
+
     landmarks = load_polygons(args.map)
     readings = load_polygons(args.sensing)
     N = int(args.num_particles)
@@ -313,7 +325,7 @@ if __name__ == '__main__':
     #     print(weights, sum(weights))
     # estimates = generate_estimates(landmarks, contr,dists, particles, weights, N)
     ests = show_animation(landmarks,contr, dists, particles, weights, N)
-    np.save(args.estimates, ests, allow_pickle=True)
+    # np.save(args.estimates, ests, allow_pickle=True)
     #particle_filter(contr, dists, landmarks, N)
 
 

@@ -19,6 +19,18 @@ showing a landmark map from maps/landmark_X.npy
 b) Show a 2nd robot in red, this is where we think we are based on odometry model and 
 """
 
+X,Y,Z = None, None, None
+
+def set_X_Y_Z(readings_fname):
+    global X,Y,Z
+    toks = readings_fname.split('_')
+    X = toks[1]
+    Y = toks[2]
+    Z = toks[3]
+
+
+    
+
 def get_body(ax, center, angle_degrees, width=0.2, height=0.1, color='b'):
     x, y = center
     rect = patches.Rectangle((x - width / 2, y - height / 2), width, height, linewidth=1, edgecolor=color, facecolor='none')
@@ -56,6 +68,7 @@ def estimate_landmark_position(robot_x, robot_y, robot_theta, measurements):
 
 def update(frame, sensed, sensors, car1, visited1, landmarks, trace1, visited2, trace2, poses):
     # This code is to get dead reckoning car animation using controls
+    if frame > 0: car1.body.remove() # New line
     car1.u = sensed[frame]
     car1.next()
     car1.get_body()
@@ -85,7 +98,7 @@ def show_animation(landmarks,initPose,controls,sensors, poses):
     plt.scatter(landmarks[:,0], landmarks[:,1])
     ani = FuncAnimation(dead_reckon_car.fig, update, frames=200,
                         fargs=(controls, sensors, dead_reckon_car,visited1, landmark_x, car_trace, visited2, gt_trace, poses),interval=100, blit=True, repeat=False)
-    plt.show()
+    ani.save(f'dr/dr_{X}_{Y}_{Z}.mp4',writer='ffmpeg', fps = 30)
 
 # Usage python3 dead_reckoning.py --map maps/landmarks_X.npy --execution gts/gt_X_Y.npy --sensing readings/readings_X_Y_Z.npy
 if __name__ == '__main__':
@@ -99,6 +112,7 @@ if __name__ == '__main__':
     gt = load_polygons(args.execution) # each row is a configuration
     readings = load_polygons(args.sensing)
     plan = load_polygons('controls/controls_0_0.npy')
+    set_X_Y_Z(args.sensing)
 
     sensed_controls = [readings[0]]
     for i in range(401):

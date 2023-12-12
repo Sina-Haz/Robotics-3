@@ -8,6 +8,15 @@ from particle_filter import update, create_uniform_particles,set_std_dev, std_de
 
 pi = np.pi
 
+X,Y,Z,N = None,None,None,None
+
+def set_X_Y_Z(fname):
+    global X,Y,Z
+    toks = fname.split('_')
+    X = toks[1]
+    Y = toks[2]
+    Z = toks[3]
+    N = toks[4]
 
 def show_animation(landmarks, controls, distances, particles, weights, N):
     ax=create_plot()
@@ -21,7 +30,7 @@ def show_animation(landmarks, controls, distances, particles, weights, N):
     particle_scatter = plt.scatter(particles[:,0], particles[:,1], marker='o', alpha = 0.4, color='orange', linewidths= 0.75)
     ani = FuncAnimation(diff_car.fig, update, frames=200,
                         fargs=(controls,diff_car, test_car, visited,estimates, car_trace, distances, particles, weights, landmarks,landmark_x, particle_scatter,particle_trace, N),interval=100, blit=True, repeat=False)
-    plt.show()
+    ani.save(f'video2/particles_{X}_{Y}_{Z}_{N}.mp4', writer='ffmpeg', fps=30)
     return np.array(estimates)
 
 
@@ -34,6 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
     args = parser.parse_args()
 
+    set_X_Y_Z(args.estimates)
     landmarks = load_polygons(args.map)
     readings = load_polygons(args.sensing)
     N = int(args.num_particles)
@@ -51,5 +61,5 @@ if __name__ == '__main__':
     #     correction(particles,weights,dists[i],landmarks)
     #     print(weights, sum(weights))
     estimates = show_animation(landmarks,contr, dists, particles, weights, N)
-    np.save(args.estimates, estimates, allow_pickle=True)
+    # np.save(args.estimates, estimates, allow_pickle=True)
     #particle_filter(contr, dists, landmarks, N)

@@ -68,7 +68,7 @@ def estimate_landmark_position(robot_x, robot_y, robot_theta, measurements):
 
 def update(frame, sensed, sensors, car1, visited1, landmarks, trace1, visited2, trace2, poses):
     # This code is to get dead reckoning car animation using controls
-    if frame > 0: car1.body.remove() # New line
+    if car1.body : car1.body.remove() # New line
     car1.u = sensed[frame]
     car1.next()
     car1.get_body()

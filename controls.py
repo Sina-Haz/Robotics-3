@@ -92,7 +92,7 @@ def show_visualization(controls, landmarks,X,Y):
     plt.plot(xs,ys,'bo',label='Trace')
     ax = plt.gca()
     draw_rotated_rectangle(ax, q[0:2], np.degrees(q[2]+pi/2))
-    plt.savefig(f'others/controls_{X}_{Y}.jpg',format='jpg')
+    # plt.savefig(f'others/controls_{X}_{Y}.jpg',format='jpg')
     show_scene(ax)
     
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     start = genInitPose()
     controls = genControls(start)
     landmarks = load_polygons('maps/landmarks_0.npy')
-    show_animation(landmarks,start, controls)
+    show_visualization(controls, landmarks, 0, 0)
 
 
 

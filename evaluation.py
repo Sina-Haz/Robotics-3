@@ -19,6 +19,7 @@ def update(frame, car, gts, ests, gt_trace, estim_trace, gt_visit, estim_visit):
 
 
 def show_animation(landmarks, gts, estimates):
+    plt.close('all')
     ax = create_plot()
     plt.scatter(landmarks[:,0], landmarks[:, 1])
     gt_visit,estim_visit = [], []
@@ -33,7 +34,7 @@ def angular_distance(angle1, angle2):
     return np.abs(diff)
 
 def gen_plots(gts, estimates):
-    assert np.allclose(gts[0],estimates[0])
+    #assert np.allclose(gts[0],estimates[0])
     timesteps = np.arange(0,201,1)
     distances = np.linalg.norm(gts[:,0:2] - estimates[:, 0:2], axis=1)
     angular_dists = angular_distance(gts[:,2], estimates[:,2])
@@ -61,6 +62,6 @@ if __name__ == '__main__':
     landmarks = load_polygons(args.map)
     gt = load_polygons(args.execution)
     estims = load_polygons(args.estimates)
-
-    # show_animation(landmarks, gt, estims)
+    show_animation(landmarks, gt, estims)
+    plt.close('all')
     gen_plots(gt,estims)

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from diff_drive import Car
 import matplotlib.patches as patches
 from simulate import landmark_sensor
-
+from particle_filter import estimate_landmark_position
 """
 For observation model: getting P(z|x), the std deviation of distance and angle measurements are independent
  - First compute probability of getting the distance measurements by doing landmark sensor at particle and comparing it
@@ -193,7 +193,7 @@ def getEclipse(covariance_history, estimated_trajectory):
     return ellipse
 
 
-def update(frame, P, phistory, controls, car, car2, visited,estimates, trace, distances,landmarks, ptrace, N):
+def update(frame, P, phistory, controls, car, car2, visited,estimates, trace, distances,landmarks,landmark_x, ptrace, N):
     car2.u = controls[frame]
     car2.next()
     x,y,_ = car2.q
@@ -208,11 +208,13 @@ def update(frame, P, phistory, controls, car, car2, visited,estimates, trace, di
     phistory.append(P)
     ptrace.set_data(*zip(*estimates))
 
+    x = estimate_landmark_position(estimate[0], estimate[1], estimate[2], distances[frame])
+    landmark_x.set_offsets(x)
     #ecliplse = getEclipse(phistory, estimates)
     #car.ax.add_patch(ecliplse)
     visited.append((x,y))
     trace.set_data(*zip(*visited))
-    return [car.body, trace, ptrace]
+    return [car.body, trace, ptrace, landmark_x]
 
 
 def show_animation(landmarks, controls, distances, N):
@@ -224,30 +226,28 @@ def show_animation(landmarks, controls, distances, N):
     particle_trace,  = plt.plot([],[],'ro',label='Trace')
     plt.scatter(landmarks[:,0], landmarks[:,1])
     initial_covariance = np.diag([1, 1, 0.1])
-
+    landmark_x = plt.scatter([], [], color='red', marker='x', linestyle='-')
     ani = FuncAnimation(diff_car.fig, update, frames=200,
-                        fargs=(initial_covariance, phistory, controls,diff_car, test_car, visited,estimates, car_trace, distances, landmarks,particle_trace, N),interval=100, blit=True, repeat=False)
+                        fargs=(initial_covariance, phistory, controls,diff_car, test_car, visited,estimates, car_trace, distances, landmarks, landmark_x, particle_trace, N),interval=100, blit=True, repeat=False)
     plt.show()
 
 # Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Here we solve localization using particle filter')
     parser.add_argument('--map', required=True, help='Landmark map environment')
-    parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
-    parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
-    #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
+    parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')    #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
+    parser.add_argument('--estimates', required=True, help='Sensor readings file to upload to (401 rows total)')    #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
     args = parser.parse_args()
 
     landmarks = load_polygons(args.map)
     readings = load_polygons(args.sensing)
-    N = int(args.num_particles)
+    N = 0
     set_std_dev(args.sensing)
 
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
-    particles = init_particles(initPose,N)
-    weights = np.array([1.0]*N)
+
 
     # for i in range(5):
     #     particles = prediction(particles,contr[i],N)

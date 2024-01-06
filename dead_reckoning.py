@@ -98,7 +98,7 @@ def show_animation(landmarks,initPose,controls,sensors, poses):
     plt.scatter(landmarks[:,0], landmarks[:,1])
     ani = FuncAnimation(dead_reckon_car.fig, update, frames=200,
                         fargs=(controls, sensors, dead_reckon_car,visited1, landmark_x, car_trace, visited2, gt_trace, poses),interval=100, blit=True, repeat=False)
-    ani.save(f'dr/dr_{X}_{Y}_{Z}.mp4',writer='ffmpeg', fps = 30)
+    plt.show()
 
 # Usage python3 dead_reckoning.py --map maps/landmarks_X.npy --execution gts/gt_X_Y.npy --sensing readings/readings_X_Y_Z.npy
 if __name__ == '__main__':

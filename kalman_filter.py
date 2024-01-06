@@ -193,7 +193,7 @@ def getEclipse(covariance_history, estimated_trajectory):
     return ellipse
 
 
-def update(frame, P, phistory, controls, car, car2, visited,estimates, trace, distances,landmarks, ptrace, N):
+def update(frame, P, phistory, controls, car, car2, visited,estimates, trace, distances,landmarks, ptrace):
     car2.u = controls[frame]
     car2.next()
     x,y,_ = car2.q
@@ -215,7 +215,7 @@ def update(frame, P, phistory, controls, car, car2, visited,estimates, trace, di
     return [car.body, trace, ptrace]
 
 
-def show_animation(landmarks, controls, distances, N):
+def show_animation(landmarks, controls, distances):
     ax=create_plot()
     diff_car = Car(ax, startConfig=initPose)
     test_car = Car(ax, startConfig=initPose)
@@ -226,34 +226,33 @@ def show_animation(landmarks, controls, distances, N):
     initial_covariance = np.diag([1, 1, 0.1])
 
     ani = FuncAnimation(diff_car.fig, update, frames=200,
-                        fargs=(initial_covariance, phistory, controls,diff_car, test_car, visited,estimates, car_trace, distances, landmarks,particle_trace, N),interval=100, blit=True, repeat=False)
+                        fargs=(initial_covariance, phistory, controls,diff_car, test_car, visited,estimates, car_trace, distances, landmarks,particle_trace),interval=100, blit=True, repeat=False)
     plt.show()
 
-# Usage: python3 particle_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy --num_particles N --estimates estim1/estim1_X_Y_Z_N.npy
+# Usage: python3 kalman_filter.py --map maps/landmarks_X.npy --sensing readings/readings_X_Y_Z.npy
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Here we solve localization using particle filter')
     parser.add_argument('--map', required=True, help='Landmark map environment')
     parser.add_argument('--sensing', required=True, help='Sensor readings file to upload to (401 rows total)')
-    parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
+    # parser.add_argument('--num_particles',required=True,help = 'Number of particles for filter')
     #parser.add_argument('--estimates',required=True,help='numpy array of 201 estimated poses from filter')
     args = parser.parse_args()
 
     landmarks = load_polygons(args.map)
     readings = load_polygons(args.sensing)
-    N = int(args.num_particles)
     set_std_dev(args.sensing)
 
     contr = load_sensed_controls(readings)
     dists = load_landmark_readings(readings)
     initPose = readings[0]
-    particles = init_particles(initPose,N)
-    weights = np.array([1.0]*N)
+    # particles = init_particles(initPose,N)
+    # weights = np.array([1.0]*N)
 
     # for i in range(5):
     #     particles = prediction(particles,contr[i],N)
     #     correction(particles,weights,dists[i],landmarks)
     #     print(weights, sum(weights))
-    show_animation(landmarks,contr, dists, N)
+    show_animation(landmarks,contr, dists)
     #particle_filter(contr, dists, landmarks, N)
 
 
